@@ -30,6 +30,24 @@ string computeMD5(const string& input) {
     return string(hex_str);
 }
 
+string indexToCandidate(long long index, int length) {
+    string candidate(length, CHARSET[0]);   // fill with first char
+
+    // Work backwards from the last character position
+    for (int i = length - 1; i >= 0; i--) {
+        candidate[i] = CHARSET[index % CHARSET_SIZE];
+        index /= CHARSET_SIZE;
+    }
+    return candidate;
+}
+
+long long computeTotalCandidates(int length) {
+    long long total = 1;
+    for (int i = 0; i < length; i++)
+        total *= CHARSET_SIZE;
+    return total;
+}
+
 int main() {
 
 
