@@ -48,8 +48,115 @@ long long computeTotalCandidates(int length) {
     return total;
 }
 
+bool searchLength(int length,
+                  const string& target_hash,
+                  string& result,
+                  long long& candidates_tested)
+{
+    long long total = computeTotalCandidates(length);
+
+    bool found = false;
+
+    for (long long i = 0; i < total; i++) {
+
+
+        // Generate candidate string from numeric index
+        string candidate = indexToCandidate(i, length);
+
+        // Hash the candidate
+        string hash = computeMD5(candidate);
+
+        // Increment the counter
+        candidates_tested++;
+
+        // Compare with target
+        if (hash == target_hash) {
+            
+            found  = true;
+            result = candidate;
+            break;  
+        }
+    }
+
+    return found;
+}
+
+bool recoverPassword(const string& target_hash,
+                     string& recovered,
+                     long long& total_tested,
+                     double& elapsed_seconds)
+{
+    auto start = high_resolution_clock::now();
+    bool found = false;
+    total_tested = 0;
+
+    for (int len = 1; len <= MAX_LENGTH && !found; len++) {
+        cout << "[*] Searching length " << len
+             << "  (candidates: " << computeTotalCandidates(len) << ")\n";
+
+        // [OPENMP] The searchLength function contains the
+        // parallel for loop. No changes needed here in the
+        // outer loop for the shared-memory version.
+        found = searchLength(len, target_hash, recovered, total_tested);
+    }
+
+    auto end   = high_resolution_clock::now();
+    elapsed_seconds = duration<double>(end - start).count();
+    return found;
+}
+
+void printReport(bool found,
+                 const string& recovered,
+                 const string& target_hash,
+                 long long total_tested,
+                 double elapsed)
+{
+    cout << "\n========================================\n";
+    cout << "       PERFORMANCE REPORT (Serial)      \n";
+    cout << "========================================\n";
+    cout << fixed << setprecision(6);
+    cout << "  Status          : " << (found ? "FOUND" : "NOT FOUND") << "\n";
+    if (found)
+        cout << "  Recovered pass  : " << recovered << "\n";
+    cout << "  Target hash     : " << target_hash      << "\n";
+    cout << "  Candidates tested: " << total_tested    << "\n";
+    cout << "  Elapsed time    : " << elapsed << " seconds\n";
+    cout << "  Throughput      : "
+         << (long long)(total_tested / elapsed) << " hashes/sec\n";
+    cout << "  Charset size    : " << CHARSET_SIZE     << "\n";
+    cout << "  Max length tried: " << MAX_LENGTH       << "\n";
+    cout << "========================================\n\n";
+
+    // Verification check (required in your report: 100% match)
+    if (found) {
+        string verify = computeMD5(recovered);
+        cout << "  Verification    : "
+             << (verify == target_hash ? "PASSED ✓" : "FAILED ✗") << "\n";
+    }
+}
+
+
 int main() {
 
+    string test_passwords[] = {"a", "ab", "abc", "z9", "abc1"};
+
+    for (const string& pw : test_passwords) {
+        string target_hash = computeMD5(pw);
+
+        cout << "\n[TEST] Password: \"" << pw << "\"\n";
+        cout << "[TEST] MD5 hash: "   << target_hash << "\n\n";
+
+        string   recovered;
+        long long total_tested  = 0;
+        double    elapsed       = 0.0;
+
+        bool found = recoverPassword(target_hash,
+                                     recovered,
+                                     total_tested,
+                                     elapsed);
+
+        printReport(found, recovered, target_hash, total_tested, elapsed);
+    }
 
     return 0;
 }
