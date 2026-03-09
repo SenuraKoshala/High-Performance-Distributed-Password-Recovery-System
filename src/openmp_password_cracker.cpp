@@ -58,28 +58,42 @@ bool searchLength(int length,
     long long total = computeTotalCandidates(length);
 
     bool found = false;
+    long long local_tested = 0;
 
-    for (long long i = 0; i < total; i++) {
+    // Parallel brute-force search using 4 OpenMP threads.
+    // Each thread works on a different slice of the candidate space.
+    #pragma omp parallel num_threads(NUM_THREADS) \
+        shared(found, result) reduction(+:local_tested)
+    {
+        #pragma omp for schedule(dynamic, 1000)
+        for (long long i = 0; i < total; i++) {
 
+            // Early exit: if another thread already found the password, skip
+            if (found) continue;   // can't break out of OpenMP for, use continue
 
-        // Generate candidate string from numeric index
-        string candidate = indexToCandidate(i, length);
+            // Generate candidate string from numeric index
+            string candidate = indexToCandidate(i, length);
 
-        // Hash the candidate
-        string hash = computeMD5(candidate);
+            // Hash the candidate
+            string hash = computeMD5(candidate);
 
-        // Increment the counter
-        candidates_tested++;
+            // Increment thread-local counter (reduced at the end)
+            local_tested++;
 
-        // Compare with target
-        if (hash == target_hash) {
-            
-            found  = true;
-            result = candidate;
-            break;  
+            // Compare with target
+            if (hash == target_hash) {
+                #pragma omp critical
+                {
+                    if (!found) {       // double-check inside critical section
+                        found  = true;
+                        result = candidate;
+                    }
+                }
+            }
         }
     }
 
+    candidates_tested += local_tested;
     return found;
 }
 
