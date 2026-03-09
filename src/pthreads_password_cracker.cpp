@@ -118,3 +118,129 @@ void* threadWorker(void* arg) {
 
     return nullptr;
 }
+
+// COMMIT 3: Search Orchestration, Reporting & main()
+// - searchLength(): spawns NUM_THREADS with static slice partitioning
+// - recoverPassword(): outer loop over lengths 1..MAX_LENGTH
+// - printReport(): mirrors serial.cpp format + shows thread count & speedup hint
+// - main(): same 5-password test suite as serial.cpp
+
+// ─── Search one password length using NUM_THREADS pthreads ───────────────────
+bool searchLength(int length,
+                  const string& target_hash,
+                  string& result,
+                  long long& candidates_tested)
+{
+    long long total = computeTotalCandidates(length);
+
+    // ── Shared state init ──
+    SharedState state;
+    state.target_hash       = &target_hash;
+    state.found             = false;
+    state.candidates_tested = 0;
+    pthread_mutex_init(&state.mutex, nullptr);
+
+    // ── Static partitioning: divide [0, total) evenly across threads ──
+    // Each thread gets a contiguous chunk → no dynamic scheduling overhead,
+    // no work-stealing overhead. Works well here because all candidates take
+    // roughly equal time to hash (uniform work per iteration).
+    long long chunk = (total + NUM_THREADS - 1) / NUM_THREADS;
+
+    vector<pthread_t>   threads(NUM_THREADS);
+    vector<ThreadArgs>  thread_args(NUM_THREADS);
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        thread_args[t].length      = length;
+        thread_args[t].start_index = t * chunk;
+        thread_args[t].end_index   = min((t + 1) * chunk, total);
+        thread_args[t].state       = &state;
+
+        pthread_create(&threads[t], nullptr, threadWorker, &thread_args[t]);
+    }
+
+    // ── Join all threads ──
+    for (int t = 0; t < NUM_THREADS; t++)
+        pthread_join(threads[t], nullptr);
+
+    pthread_mutex_destroy(&state.mutex);
+
+    result            = state.result;
+    candidates_tested += state.candidates_tested;
+    return state.found;
+}
+
+// ─── Outer recovery loop (identical structure to serial.cpp) ─────────────────
+bool recoverPassword(const string& target_hash,
+                     string& recovered,
+                     long long& total_tested,
+                     double& elapsed_seconds)
+{
+    auto start   = high_resolution_clock::now();
+    bool found   = false;
+    total_tested = 0;
+
+    for (int len = 1; len <= MAX_LENGTH && !found; len++) {
+        cout << "[*] Searching length " << len
+             << "  (candidates: " << computeTotalCandidates(len)
+             << ")  [threads: " << NUM_THREADS << "]\n";
+
+        found = searchLength(len, target_hash, recovered, total_tested);
+    }
+
+    auto end        = high_resolution_clock::now();
+    elapsed_seconds = duration<double>(end - start).count();
+    return found;
+}
+
+// ─── Performance report ───────────────────────────────────────────────────────
+void printReport(bool found,
+                 const string& recovered,
+                 const string& target_hash,
+                 long long total_tested,
+                 double elapsed)
+{
+    cout << "\n========================================\n";
+    cout << "     PERFORMANCE REPORT (Pthreads)      \n";
+    cout << "========================================\n";
+    cout << fixed << setprecision(6);
+    cout << "  Status           : " << (found ? "FOUND" : "NOT FOUND") << "\n";
+    if (found)
+        cout << "  Recovered pass   : " << recovered << "\n";
+    cout << "  Target hash      : " << target_hash           << "\n";
+    cout << "  Candidates tested: " << total_tested          << "\n";
+    cout << "  Elapsed time     : " << elapsed << " seconds\n";
+    cout << "  Throughput       : "
+         << (long long)(total_tested / elapsed) << " hashes/sec\n";
+    cout << "  Threads used     : " << NUM_THREADS            << "\n";
+    cout << "  Partitioning     : Static (contiguous chunks) \n";
+    cout << "  Charset size     : " << CHARSET_SIZE           << "\n";
+    cout << "  Max length tried : " << MAX_LENGTH             << "\n";
+    cout << "========================================\n\n";
+
+    if (found) {
+        string verify = computeMD5(recovered);
+        cout << "  Verification     : "
+             << (verify == target_hash ? "PASSED ✓" : "FAILED ✗") << "\n";
+    }
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+int main() {
+    string test_passwords[] = {"a", "ab", "abc", "z9", "abc1"};
+
+    for (const string& pw : test_passwords) {
+        string target_hash = computeMD5(pw);
+
+        cout << "\n[TEST] Password: \"" << pw << "\"\n";
+        cout << "[TEST] MD5 hash: "    << target_hash << "\n\n";
+
+        string    recovered;
+        long long total_tested = 0;
+        double    elapsed      = 0.0;
+
+        bool found = recoverPassword(target_hash, recovered, total_tested, elapsed);
+        printReport(found, recovered, target_hash, total_tested, elapsed);
+    }
+
+    return 0;
+}
