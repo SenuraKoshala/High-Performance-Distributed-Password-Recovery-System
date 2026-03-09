@@ -108,7 +108,8 @@ bool recoverPassword(const string& target_hash,
 
     for (int len = 1; len <= MAX_LENGTH && !found; len++) {
         cout << "[*] Searching length " << len
-             << "  (candidates: " << computeTotalCandidates(len) << ")\n";
+             << "  (candidates: " << computeTotalCandidates(len)
+             << ", threads: " << NUM_THREADS << ")\n";
 
         found = searchLength(len, target_hash, recovered, total_tested);
     }
@@ -125,7 +126,7 @@ void printReport(bool found,
                  double elapsed)
 {
     cout << "\n========================================\n";
-    cout << "       PERFORMANCE REPORT (Serial)      \n";
+    cout << "     PERFORMANCE REPORT (OpenMP x" << NUM_THREADS << ")     \n";
     cout << "========================================\n";
     cout << fixed << setprecision(6);
     cout << "  Status          : " << (found ? "FOUND" : "NOT FOUND") << "\n";
@@ -138,6 +139,7 @@ void printReport(bool found,
          << (long long)(total_tested / elapsed) << " hashes/sec\n";
     cout << "  Charset size    : " << CHARSET_SIZE     << "\n";
     cout << "  Max length tried: " << MAX_LENGTH       << "\n";
+    cout << "  Threads used    : " << NUM_THREADS      << "\n";
     cout << "========================================\n\n";
 
     // Verification check (required in your report: 100% match)
@@ -150,6 +152,13 @@ void printReport(bool found,
 
 
 int main() {
+
+    // Set the number of threads globally as well
+    omp_set_num_threads(NUM_THREADS);
+
+    cout << "[INFO] OpenMP Password Cracker\n";
+    cout << "[INFO] Using " << NUM_THREADS << " threads\n";
+    cout << "[INFO] Max threads available: " << omp_get_max_threads() << "\n\n";
 
     string test_passwords[] = {"a", "ab", "abc", "z9", "abc1"};
 
