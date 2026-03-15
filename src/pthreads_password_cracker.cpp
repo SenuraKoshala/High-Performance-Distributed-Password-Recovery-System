@@ -44,8 +44,8 @@ struct ThreadArgs {
 // - threadWorker(): local counting to avoid false sharing,
 //   early-exit on found, mutex-protected writes
 
-// ─── Hash & index utilities (identical to serial.cpp) ────────────────────────
-string computeMD5(const string& input) {
+// ─── Hash & index utilities (identical to serial.cpp)     ///    we use to hash අංකයක් password එකක් බවට හරවනවා────────────────────────
+string computeMD5(const string& input) {            // password → hash //
     unsigned char digest[MD5_DIGEST_LENGTH];
     MD5(reinterpret_cast<const unsigned char*>(input.c_str()),
         input.size(), digest);
@@ -57,7 +57,7 @@ string computeMD5(const string& input) {
     return string(hex_str);
 }
 
-string indexToCandidate(long long index, int length) {
+string indexToCandidate(long long index, int length) {      // number → password //
     string candidate(length, CHARSET[0]);
     for (int i = length - 1; i >= 0; i--) {
         candidate[i] = CHARSET[index % CHARSET_SIZE];
@@ -83,23 +83,23 @@ void* threadWorker(void* arg) {
     ThreadArgs*  args  = static_cast<ThreadArgs*>(arg);
     SharedState* state = args->state;
 
-    long long local_count = 0;  // ← false-sharing avoidance: thread-local counter
+    long long local_count = 0;  // ← false-sharing avoidance: thread-local counter    // තමන්ගේ counter  //
 
     for (long long i = args->start_index; i < args->end_index; i++) {
 
         // Check every 1000 iterations whether another thread already found it
-        if (i % 1000 == 0) {
+        if (i % 1000 == 0) {              // හැම 1000 tries වලදී — වෙන කෙනෙක් හොයාගත්තද? //
             pthread_mutex_lock(&state->mutex);
             bool already_found = state->found;
             pthread_mutex_unlock(&state->mutex);
-            if (already_found) break;  // Early exit
+            if (already_found) break;  // Early exit             // ඔව් නම් STOP
         }
 
         string candidate = indexToCandidate(i, args->length);
         string hash      = computeMD5(candidate);
         local_count++;
 
-        if (hash == *state->target_hash) {
+        if (hash == *state->target_hash) {               // ඔව් නම් STOP  // ✅ FOUND
             // ── Critical section: write result ──
             pthread_mutex_lock(&state->mutex);
             if (!state->found) {           // Double-check: avoid overwriting
@@ -146,21 +146,21 @@ bool searchLength(int length,
     // roughly equal time to hash (uniform work per iteration).
     long long chunk = (total + NUM_THREADS - 1) / NUM_THREADS;
 
-    vector<pthread_t>   threads(NUM_THREADS);
-    vector<ThreadArgs>  thread_args(NUM_THREADS);
+    vector<pthread_t>   threads(NUM_THREADS);  // thrad 8 create 
+    vector<ThreadArgs>  thread_args(NUM_THREADS);   // agrgument create 
 
-    for (int t = 0; t < NUM_THREADS; t++) {
+    for (int t = 0; t < NUM_THREADS; t++) {    // value assine value for argument
         thread_args[t].length      = length;
         thread_args[t].start_index = t * chunk;
         thread_args[t].end_index   = min((t + 1) * chunk, total);
         thread_args[t].state       = &state;
 
-        pthread_create(&threads[t], nullptr, threadWorker, &thread_args[t]);
+        pthread_create(&threads[t], nullptr, threadWorker, &thread_args[t]);   // create and process thereds
     }
 
     // ── Join all threads ──
     for (int t = 0; t < NUM_THREADS; t++)
-        pthread_join(threads[t], nullptr);
+        pthread_join(threads[t], nullptr);   // waiting for process 
 
     pthread_mutex_destroy(&state.mutex);
 
@@ -232,7 +232,7 @@ int main() {
         string target_hash = computeMD5(pw);
 
         cout << "\n[TEST] Password: \"" << pw << "\"\n";
-        cout << "[TEST] MD5 hash: "    << target_hash << "\n\n";
+        cout << "[TEST] MD5 hash: "    << target_hash << "\n\n"; // hash හදනවා  // crack කරනවා   // results print කරනවා
 
         string    recovered;
         long long total_tested = 0;
@@ -244,3 +244,7 @@ int main() {
 
     return 0;
 }
+
+
+
+//                       Results print කරනවා — time, speed, verification
