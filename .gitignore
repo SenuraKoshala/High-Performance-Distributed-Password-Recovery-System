@@ -2,6 +2,7 @@
 recover
 serial_cracker
 recover_omp
+recover_mpi
 
 # Wordlists and large datasets
 wordlist.txt
