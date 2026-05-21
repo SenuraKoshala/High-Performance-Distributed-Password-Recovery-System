@@ -1,6 +1,7 @@
 # Compiled binaries
 recover
 serial_cracker
+recover_omp
 
 # Wordlists and large datasets
 wordlist.txt
