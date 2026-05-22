@@ -31,3 +31,12 @@ mpirun -np 4 ./recover_mpi
 # More processes than cores (for testing):
 
 mpirun -np 8 --oversubscribe ./recover_mpi
+
+# Password Recovery Hybrid
+
+mpicxx -O2 -std=c++17 -fopenmp \
+    password_recovery_hybrid_mpi_openmp.cpp \
+    -lssl -lcrypto \
+    -o recover_hybrid
+
+OMP_NUM_THREADS=4 mpirun -np 4 ./recover_hybrid
