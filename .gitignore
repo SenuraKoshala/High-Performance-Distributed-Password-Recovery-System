@@ -1,4 +1,15 @@
-# Compiled binaries
+# Compiled C++/CUDA binaries
+src/recover_serial
+src/recover_omp
+src/recover_mpi
+src/recover_hybrid
+src/recover_mpi_cuda
+src/recover_mpi_test
+src/openmp_cracker
+src/*.o
+src/*.out
+
+# Legacy binary names (root directory)
 recover
 serial_cracker
 recover_omp
@@ -7,3 +18,22 @@ recover_hybrid
 
 # Wordlists and large datasets
 wordlist.txt
+
+# Python Backend & Scripts
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+web/backend/venv/
+web/backend/__pycache__/
+test_cracker.py
+web/backend/test_cracker.py
+test_*.py
+debug_*.py
+output*.txt
+
+# React Frontend
+web/frontend/node_modules/
+web/frontend/dist/
+web/frontend/.DS_Store
+web/frontend/.env.local
