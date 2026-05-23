@@ -1,3 +1,4 @@
+#include <functional>
 /*
  * ============================================================
  *  High-Performance Password Recovery System
