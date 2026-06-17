@@ -122,6 +122,7 @@ When testing the system, keep in mind **Parallel Overhead**. If you test a very 
 
 To see the true scaling power of the parallel implementations, run the benchmark against a complex password located deep inside the 14-million word dictionary, or use a complex 5-character string for GPU Brute Forcing!
 
+<<<<<<< HEAD
 # Serial code
 
 ./recover
@@ -152,3 +153,27 @@ OMP_NUM_THREADS=2 mpirun -np 4 ./recover_hybrid
 OMP_NUM_THREADS=4 mpirun -np 2 ./recover_hybrid
 OMP_NUM_THREADS=4 mpirun -np 4 ./recover_hybrid
 ```
+=======
+---
+
+## 🛠️ MPI Architecture & Code Reference (viva Prep)
+
+For the viva presentation, the MPI processes communicate using a master-worker dynamic scheduling architecture. Below is a reference of the core MPI functions utilized in the C++ binaries:
+
+### 1. Environment & Process Setup
+*   **`MPI_Init_thread`**: Initializes the MPI execution environment with thread support. In this project, `MPI_THREAD_FUNNELED` is specified to guarantee that only the main thread of each MPI process calls network operations, keeping the OpenMP sub-threads focused entirely on calculation.
+*   **`MPI_Comm_rank`**: Acquires the unique ID ("rank") of the current process. **Rank 0** is designated as the **Master**, while all other ranks (**1 to N-1**) act as **Workers**.
+*   **`MPI_Comm_size`**: Retrieves the total process count to split search space indices and calculate benchmark speeds.
+
+### 2. Synchronization & Data Sharing
+*   **`MPI_Bcast` (Broadcast)**: One-to-all communication. The Master (Rank 0) uses this to broadcast global parameters (target hash, max search length, and attack mode) to all worker nodes in one transaction.
+*   **`MPI_Barrier`**: A global barrier synchronization. It blocks processes until all ranks reach the barrier. This ensures that different attack modes do not run concurrently during full comparison benchmarks, preventing CPU thread interference and keeping the measurements highly accurate.
+
+### 3. Dynamic Work Scheduling
+*   **`MPI_Send` / `MPI_Recv`**: Core point-to-point blocking transmission calls. The Master uses `MPI_Send` to dispatch chunks of work (first-character indices or dictionary buffers), and workers use them to send back candidate counts (`TAG_DONE`) or the verified password (`TAG_FOUND`).
+*   **`MPI_Probe`**: Checks for incoming messages without pulling them out of the network queue. The Master uses it with wildcards (`MPI_ANY_SOURCE`, `MPI_ANY_TAG`) to monitor which worker process finished first and what type of report it sent (cracked or finished), allocating the correct buffer size dynamically before calling receive.
+
+### 4. Termination & Shutdown
+*   **`MPI_Abort`**: Instantly terminates all processes in the communicator group in the event of a fatal error (e.g., missing dictionary files or empty password entry).
+*   **`MPI_Finalize`**: Safely shuts down the MPI session, frees memory buffers, and prevents active ranks from hanging at process termination.
+>>>>>>> b84ba03d2636be0625aca1283f96a497f654a777

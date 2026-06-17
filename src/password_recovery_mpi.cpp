@@ -407,6 +407,7 @@ void bfWorker(int rank, const std::string& target,
             char pwbuf[MAX_WORD] = {};
             std::strncpy(pwbuf, found_pw.c_str(), MAX_WORD - 1);
             MPI_Send(pwbuf, MAX_WORD, MPI_CHAR, 0, TAG_FOUND, MPI_COMM_WORLD);
+            MPI_Send(&local_tested, 1, MPI_LONG_LONG_INT, 0, TAG_FOUND, MPI_COMM_WORLD);
             // Wait for STOP
             int stop;
             MPI_Recv(&stop, 1, MPI_INT, 0, TAG_STOP,
@@ -438,11 +439,15 @@ Result bfMaster(const std::string& target,
 
     TP t0 = Clock::now();
 
+    // Track which workers are still alive
+    std::vector<bool> alive(nprocs, false);
+
     // Seed every worker with its first job
     for (int w = 1; w < nprocs && nextCi < CS; ++w) {
         MPI_Send(&nextCi, 1, MPI_INT, w, TAG_WORK, MPI_COMM_WORLD);
         ++nextCi;
         ++active;
+        alive[w] = true;
     }
 
     // Dynamic work-queue loop
@@ -457,16 +462,20 @@ Result bfMaster(const std::string& target,
             char pwbuf[MAX_WORD] = {};
             MPI_Recv(pwbuf, MAX_WORD, MPI_CHAR, src, TAG_FOUND,
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            long long cnt;
+            MPI_Recv(&cnt, 1, MPI_LONG_LONG_INT, src, TAG_FOUND, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            total += cnt;
             cracked = pwbuf;
             found   = true;
 
             // Send STOP to the reporting worker (it's waiting for it)
             int stop = -1;
             MPI_Send(&stop, 1, MPI_INT, src, TAG_STOP, MPI_COMM_WORLD);
+            alive[src] = false;
 
-            // Send STOP to all other active workers
+            // Send STOP only to workers that are still alive
             for (int w = 1; w < nprocs; ++w) {
-                if (w == src) continue;
+                if (w == src || !alive[w]) continue;
                 int ci = -1;
                 MPI_Send(&ci, 1, MPI_INT, w, TAG_WORK, MPI_COMM_WORLD);
             }
@@ -487,6 +496,7 @@ Result bfMaster(const std::string& target,
                 // No more work — send STOP
                 int ci = -1;
                 MPI_Send(&ci, 1, MPI_INT, src, TAG_WORK, MPI_COMM_WORLD);
+                alive[src] = false;
                 --active;
             }
         }
@@ -571,6 +581,7 @@ void dictWorker(int rank, const std::string& target) {
             char pwbuf[MAX_WORD] = {};
             std::strncpy(pwbuf, found_pw.c_str(), MAX_WORD - 1);
             MPI_Send(pwbuf, MAX_WORD, MPI_CHAR, 0, TAG_FOUND, MPI_COMM_WORLD);
+            MPI_Send(&local_tested, 1, MPI_LONG_LONG_INT, 0, TAG_FOUND, MPI_COMM_WORLD);
             // Wait for STOP ack
             MPI_Recv(buf, BATCH_BUF, MPI_CHAR, 0, TAG_STOP,
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -621,6 +632,9 @@ Result dictMaster(const std::string& target,
             char pwbuf[MAX_WORD] = {};
             MPI_Recv(pwbuf, MAX_WORD, MPI_CHAR, src, TAG_FOUND,
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            long long cnt;
+            MPI_Recv(&cnt, 1, MPI_LONG_LONG_INT, src, TAG_FOUND, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            total += cnt;
             cracked = pwbuf;
             found   = true;
 
@@ -749,6 +763,7 @@ void ruleWorker(int rank, const std::string& target) {
             char pwbuf[MAX_WORD] = {};
             std::strncpy(pwbuf, found_pw.c_str(), MAX_WORD - 1);
             MPI_Send(pwbuf, MAX_WORD, MPI_CHAR, 0, TAG_FOUND, MPI_COMM_WORLD);
+            MPI_Send(&local_tested, 1, MPI_LONG_LONG_INT, 0, TAG_FOUND, MPI_COMM_WORLD);
             MPI_Recv(buf, BATCH_BUF, MPI_CHAR, 0, TAG_STOP,
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             break;
@@ -799,6 +814,9 @@ Result ruleMaster(const std::string& target,
             char pwbuf[MAX_WORD] = {};
             MPI_Recv(pwbuf, MAX_WORD, MPI_CHAR, src, TAG_FOUND,
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            long long cnt;
+            MPI_Recv(&cnt, 1, MPI_LONG_LONG_INT, src, TAG_FOUND, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            total += cnt;
             cracked = pwbuf;
             found   = true;
 
